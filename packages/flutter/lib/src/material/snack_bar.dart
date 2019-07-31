@@ -6,7 +6,6 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
 import 'button_theme.dart';
-import 'color_scheme.dart';
 import 'flat_button.dart';
 import 'material.dart';
 import 'scaffold.dart';
@@ -15,6 +14,7 @@ import 'theme.dart';
 import 'theme_data.dart';
 
 const double _singleLineVerticalPadding = 14.0;
+const Color _snackBarBackgroundColor = Color(0xFF323232);
 
 // TODO(ianh): We should check if the given text and actions are going to fit on
 // one line or not, and if they are, use the single-line layout, and if not, use
@@ -158,8 +158,6 @@ class _SnackBarActionState extends State<SnackBarAction> {
 ///    displayed snack bar, if any, and allows the next to be displayed.
 ///  * [SnackBarAction], which is used to specify an [action] button to show
 ///    on the snack bar.
-///  * [SnackBarThemeData], to configure the default property values for
-///    [SnackBar] widgets.
 ///  * <https://material.io/design/components/snackbars.html>
 class SnackBar extends StatelessWidget {
   /// Creates a snack bar.
@@ -186,10 +184,7 @@ class SnackBar extends StatelessWidget {
   /// Typically a [Text] widget.
   final Widget content;
 
-  /// The Snackbar's background color. If not specified it will use
-  /// [ThemeData.snackBarTheme.backgroundColor]. If that is not specified
-  /// it will default to a dark variation of [ColorScheme.surface] for light
-  /// themes, or [ColorScheme.onSurface] for dark themes.
+  /// The Snackbar's background color. By default the color is dark grey.
   final Color backgroundColor;
 
   /// The z-coordinate at which to place the snack bar. This controls the size
@@ -250,40 +245,15 @@ class SnackBar extends StatelessWidget {
     final MediaQueryData mediaQueryData = MediaQuery.of(context);
     assert(animation != null);
     final ThemeData theme = Theme.of(context);
-    final ColorScheme colorScheme = theme.colorScheme;
     final SnackBarThemeData snackBarTheme = theme.snackBarTheme;
-    final bool isThemeDark = theme.brightness == Brightness.dark;
-
-    // SnackBar uses a theme that is the opposite brightness from
-    // the surrounding theme.
-    final Brightness brightness = isThemeDark ? Brightness.light : Brightness.dark;
-    final Color themeBackgroundColor = isThemeDark
-      ? colorScheme.onSurface
-      : Color.alphaBlend(colorScheme.onSurface.withOpacity(0.80), colorScheme.surface);
-    final ThemeData inverseTheme = ThemeData(
-      brightness: brightness,
-      backgroundColor: themeBackgroundColor,
-      colorScheme: ColorScheme(
-        primary: colorScheme.onPrimary,
-        primaryVariant: colorScheme.onPrimary,
-        // For the button color, the spec says it should be primaryVariant, but for
-        // backward compatibility on light themes we are leaving it as secondary.
-        secondary: isThemeDark ? colorScheme.primaryVariant : colorScheme.secondary,
-        secondaryVariant: colorScheme.onSecondary,
-        surface: colorScheme.onSurface,
-        background: themeBackgroundColor,
-        error: colorScheme.onError,
-        onPrimary: colorScheme.primary,
-        onSecondary: colorScheme.secondary,
-        onSurface: colorScheme.surface,
-        onBackground: colorScheme.background,
-        onError: colorScheme.error,
-        brightness: brightness,
-      ),
+    // TODO(rami-a): Use a light theme if the app has a dark theme, https://github.com/flutter/flutter/issues/31418
+    final ThemeData darkTheme = ThemeData(
+      brightness: Brightness.dark,
+      accentColor: theme.accentColor,
+      accentColorBrightness: theme.accentColorBrightness,
       snackBarTheme: snackBarTheme,
     );
-
-    final TextStyle contentTextStyle = snackBarTheme.contentTextStyle ?? inverseTheme.textTheme.subhead;
+    final TextStyle contentTextStyle = snackBarTheme.contentTextStyle ?? darkTheme.textTheme.subhead;
     final SnackBarBehavior snackBarBehavior = behavior ?? snackBarTheme.behavior ?? SnackBarBehavior.fixed;
     final bool isFloatingSnackBar = snackBarBehavior == SnackBarBehavior.floating;
     final double snackBarPadding = isFloatingSnackBar ? 16.0 : 24.0;
@@ -327,7 +297,7 @@ class SnackBar extends StatelessWidget {
     );
 
     final double elevation = this.elevation ?? snackBarTheme.elevation ?? 6.0;
-    final Color backgroundColor = this.backgroundColor ?? snackBarTheme.backgroundColor ?? inverseTheme.backgroundColor;
+    final Color backgroundColor = this.backgroundColor ?? snackBarTheme.backgroundColor ?? _snackBarBackgroundColor;
     final ShapeBorder shape = this.shape
       ?? snackBarTheme.shape
       ?? (isFloatingSnackBar ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(4.0)) : null);
@@ -337,7 +307,7 @@ class SnackBar extends StatelessWidget {
       elevation: elevation,
       color: backgroundColor,
       child: Theme(
-        data: inverseTheme,
+        data: darkTheme,
         child: mediaQueryData.accessibleNavigation
             ? snackBar
             : FadeTransition(

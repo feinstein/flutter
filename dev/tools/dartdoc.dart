@@ -123,8 +123,6 @@ Future<void> main(List<String> arguments) async {
   );
   print('\n${result.stdout}flutter version: $version\n');
 
-  dartdocBaseArgs.add('--allow-tools');
-
   if (args['json']) {
     dartdocBaseArgs.add('--json');
   }
