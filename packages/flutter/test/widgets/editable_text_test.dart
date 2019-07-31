@@ -16,7 +16,7 @@ import 'package:flutter/foundation.dart';
 import 'editable_text_utils.dart';
 import 'semantics_tester.dart';
 
-final TextEditingController controller = TextEditingController();
+TextEditingController controller;
 final FocusNode focusNode = FocusNode(debugLabel: 'EditableText Node');
 final FocusScopeNode focusScopeNode = FocusScopeNode(debugLabel: 'EditableText Scope Node');
 const TextStyle textStyle = TextStyle();
@@ -29,6 +29,12 @@ enum HandlePositionInViewport {
 void main() {
   setUp(() {
     debugResetSemanticsIdCounter();
+    controller = TextEditingController();
+  });
+
+  tearDown(() {
+    controller.dispose();
+    controller = null;
   });
 
   // Tests that the desired keyboard action button is requested.
@@ -528,7 +534,7 @@ void main() {
         equals('TextInputAction.done'));
   });
 
-  testWidgets('can only show toolbar when there is text and a selection', (WidgetTester tester) async {
+  testWidgets('can show toolbar when there is text and a selection', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: EditableText(
@@ -545,17 +551,12 @@ void main() {
     final EditableTextState state =
         tester.state<EditableTextState>(find.byType(EditableText));
 
+    // Can't show the toolbar when there's no focus.
     expect(state.showToolbar(), false);
     await tester.pump();
     expect(find.text('PASTE'), findsNothing);
 
-    controller.text = 'blah';
-    await tester.pump();
-    expect(state.showToolbar(), false);
-    await tester.pump();
-    expect(find.text('PASTE'), findsNothing);
-
-    // Select something. Doesn't really matter what.
+    // Can show the toolbar when focused even though there's no text.
     state.renderEditable.selectWordsInRange(
       from: const Offset(0, 0),
       cause: SelectionChangedCause.tap,
@@ -564,19 +565,28 @@ void main() {
     expect(state.showToolbar(), true);
     await tester.pump();
     expect(find.text('PASTE'), findsOneWidget);
+
+    // Hide the menu again.
+    state.hideToolbar();
+    await tester.pump();
+    expect(find.text('PASTE'), findsNothing);
+
+    // Can show the menu with text and a selection.
+    controller.text = 'blah';
+    await tester.pump();
+    expect(state.showToolbar(), true);
+    await tester.pump();
+    expect(find.text('PASTE'), findsOneWidget);
   });
 
-  testWidgets('can dynamically disable options in toolbar', (WidgetTester tester) async {
+  testWidgets('can show the toolbar after clearing all text', (WidgetTester tester) async {
+    // Regression test for https://github.com/flutter/flutter/issues/35998.
     await tester.pumpWidget(
       MaterialApp(
         home: EditableText(
           backgroundCursorColor: Colors.grey,
-          controller: TextEditingController(text: 'blah blah'),
+          controller: controller,
           focusNode: focusNode,
-          toolbarOptions: const ToolbarOptions(
-            copy: true,
-            selectAll: true,
-          ),
           style: textStyle,
           cursorColor: cursorColor,
           selectionControls: materialTextSelectionControls,
@@ -585,58 +595,28 @@ void main() {
     );
 
     final EditableTextState state =
-    tester.state<EditableTextState>(find.byType(EditableText));
+        tester.state<EditableTextState>(find.byType(EditableText));
 
-    // Select something. Doesn't really matter what.
+    // Add text and an empty selection.
+    controller.text = 'blah';
+    await tester.pump();
     state.renderEditable.selectWordsInRange(
       from: const Offset(0, 0),
       cause: SelectionChangedCause.tap,
     );
     await tester.pump();
+
+    // Clear the text and selection.
+    expect(find.text('PASTE'), findsNothing);
+    state.updateEditingValue(const TextEditingValue(
+      text: '',
+    ));
+    await tester.pump();
+
+    // Should be able to show the toolbar.
     expect(state.showToolbar(), true);
     await tester.pump();
-    expect(find.text('SELECT ALL'), findsOneWidget);
-    expect(find.text('COPY'), findsOneWidget);
-    expect(find.text('PASTE'), findsNothing);
-    expect(find.text('CUT'), findsNothing);
-  });
-
-  testWidgets('cut and paste are disabled in read only mode even if explicit set', (WidgetTester tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: EditableText(
-          backgroundCursorColor: Colors.grey,
-          controller: TextEditingController(text: 'blah blah'),
-          focusNode: focusNode,
-          readOnly: true,
-          toolbarOptions: const ToolbarOptions(
-            paste: true,
-            cut: true,
-            selectAll: true,
-            copy: true,
-          ),
-          style: textStyle,
-          cursorColor: cursorColor,
-          selectionControls: materialTextSelectionControls,
-        ),
-      ),
-    );
-
-    final EditableTextState state =
-    tester.state<EditableTextState>(find.byType(EditableText));
-
-    // Select something. Doesn't really matter what.
-    state.renderEditable.selectWordsInRange(
-      from: const Offset(0, 0),
-      cause: SelectionChangedCause.tap,
-    );
-    await tester.pump();
-    expect(state.showToolbar(), true);
-    await tester.pump();
-    expect(find.text('SELECT ALL'), findsOneWidget);
-    expect(find.text('COPY'), findsOneWidget);
-    expect(find.text('PASTE'), findsNothing);
-    expect(find.text('CUT'), findsNothing);
+    expect(find.text('PASTE'), findsOneWidget);
   });
 
   testWidgets('Fires onChanged when text changes via TextSelectionOverlay', (WidgetTester tester) async {
@@ -1734,14 +1714,8 @@ void main() {
                         SemanticsFlag.isObscured,
                         SemanticsFlag.isFocused,
                       ],
-                      actions: <SemanticsAction>[
-                        SemanticsAction.moveCursorBackwardByCharacter,
-                        SemanticsAction.setSelection,
-                        SemanticsAction.moveCursorBackwardByWord
-                      ],
                       value: expectedValue,
                       textDirection: TextDirection.ltr,
-                      textSelection: const TextSelection.collapsed(offset: 24),
                     ),
                   ],
                 ),
